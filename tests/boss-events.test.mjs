@@ -8,7 +8,7 @@ function setup() {
   const classes = {add(){},remove(){}};
   const ctx = {
     window: {navigator:{vibrate(v){result.vibration.push(v);}}, addEventListener(){}},
-    document: {getElementById(){return {classList:classes};}},
+    document: {getElementById(){return {classList:classes};},createElement(){return {style:{},setAttribute(){},addEventListener(){},textContent:'',disabled:false}},body:{appendChild(){}}},
     novaBtn:{classList:classes},
     width:390,height:780,level:1,gameState:'MENU',mg:null,mgKeys:{},
     score:0,gems:0,runGems:0,glitchTimer:0,screenShake:0,
