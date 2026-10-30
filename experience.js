@@ -2,7 +2,7 @@
 (()=>{
 'use strict';
 if(window.ORBIT_EXPERIENCE_VERSION)return;
-window.ORBIT_EXPERIENCE_VERSION='2.1';
+window.ORBIT_EXPERIENCE_VERSION='3.0';
 const doc=document, root=doc.body;
 const style=doc.createElement('style');
 style.textContent=`
@@ -22,6 +22,7 @@ style.textContent=`
 #orbit-exp-toast{position:fixed;z-index:960;top:calc(78px + env(safe-area-inset-top));left:50%;transform:translate(-50%,-20px);width:max-content;max-width:88vw;box-sizing:border-box;padding:12px 19px;border:1px solid #98fff5a0;border-radius:16px;background:linear-gradient(115deg,#081a2cf5,#26143af5);color:#f1feff;text-align:center;font:800 13px system-ui;box-shadow:0 0 35px #79fff944;opacity:0;pointer-events:none;transition:opacity .2s,transform .25s}
 #orbit-exp-toast.visible{opacity:1;transform:translate(-50%,0)}
 #orbit-exp-fx{position:fixed;inset:0;z-index:850;pointer-events:none}
+.orbit-shop-price{color:#ffdea2;font-weight:800}.orbit-shop-item{display:flex;align-items:center;gap:12px;min-width:0;flex:1}.orbit-shop-item .orbit-shop-icon{display:grid;place-items:center;font-size:24px;width:44px;height:44px;border:2px solid;border-radius:14px;flex:none}.orbit-shop-item small{display:block;color:#a8bad2;margin-top:4px;font-size:11px}.orbit-shop-action:disabled{opacity:.42;cursor:not-allowed}
 .orbit-reward-card{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .orbit-reward-icon{width:43px;height:43px;flex:none;border:1px solid #86dfff73;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#213957,#231532);font-size:22px}
 .orbit-reward-detail{flex:1;min-width:0}.orbit-reward-detail strong{display:block;font-size:13px;color:#fff}
@@ -37,7 +38,7 @@ const storageKey='orbit-echo-experience-v1';
 let saved={};
 try{saved=JSON.parse(localStorage.getItem(storageKey)||'{}')||{}}catch(_){}
 const data={best:Number(saved.best)||0,runs:Number(saved.runs)||0,sector:Number(saved.sector)||0,scoreMilestones:Array.isArray(saved.scoreMilestones)?saved.scoreMilestones:[],daily:saved.daily||'',dailyBest:Number(saved.dailyBest)||0,bossWins:Number(saved.bossWins)||0,
- claimed:(saved.claimed&&typeof saved.claimed==='object'&&!Array.isArray(saved.claimed))?saved.claimed:{},stardust:Number(saved.stardust)||0,selectedTrail:String(saved.selectedTrail||'standard')};
+ claimed:(saved.claimed&&typeof saved.claimed==='object'&&!Array.isArray(saved.claimed))?saved.claimed:{},stardust:Number(saved.stardust)||0,selectedTrail:String(saved.selectedTrail||'standard'),purchased:(saved.purchased&&typeof saved.purchased==='object'&&!Array.isArray(saved.purchased))?saved.purchased:{}};
 const rewards=[
  {id:'first',name:'First Flight',needed:()=>data.runs>0,prize:'100 stardust + Azure Trail',dust:100,trail:'azure'},
  {id:'rising',name:'Rising Star',needed:()=>data.best>=5000,prize:'250 stardust + Solar Trail',dust:250,trail:'solar'},
@@ -47,8 +48,20 @@ const rewards=[
 ];
 function dailyGoal(){return 3000+(Number(dateKey().replaceAll('-',''))%5)*1000}
 function claimId(reward){return reward.id==='daily'?'daily:'+dateKey():reward.id}
-function dustBalance(){return data.stardust}
-function ownTrail(id){return id==='standard'||rewards.some(r=>r.trail===id&&!!data.claimed[r.id])}
+function dustBalance(){return Math.max(0,data.stardust)}
+const shopItems=[
+ {id:'emerald',title:'Emerald Comet',cost:180,color:'#68ffb2',icon:'☄️'},
+ {id:'ember',title:'Ember Drive',cost:320,color:'#ff914d',icon:'🔥'},
+ {id:'frost',title:'Frost Nova',cost:480,color:'#a5d9ff',icon:'❄️'},
+ {id:'galaxy',title:'Galaxy Pulse',cost:700,color:'#f897ff',icon:'🌌'}
+];
+function ownTrail(id){return id==='standard'||!!data.purchased[id]||rewards.some(r=>r.trail===id&&!!data.claimed[r.id])}
+function buyItem(id){
+ const item=shopItems.find(a=>a.id===id);
+ if(!item||data.purchased[id]||data.stardust<item.cost)return false;
+ data.stardust-=item.cost;data.purchased[id]=true;data.selectedTrail=id;
+ persist();notify('UNLOCKED '+item.title,'Trail equipped',true);panel();return true;
+}
 function claimReward(id){
  const reward=rewards.find(r=>r.id===id);
  if(!reward||!reward.needed()||data.claimed[claimId(reward)])return false;
@@ -57,7 +70,7 @@ function claimReward(id){
  if(reward.trail)data.selectedTrail=reward.trail;
  persist();notify('REWARD CLAIMED',reward.prize,true);panel();return true;
 }
-function selectedColor(){return {azure:'#80faff',solar:'#ffdc65',nebula:'#cd80ff',royal:'#ff7b9b'}[data.selectedTrail]||null}
+function selectedColor(){return {azure:'#80faff',solar:'#ffdc65',nebula:'#cd80ff',royal:'#ff7b9b',emerald:'#68ffb2',ember:'#ff914d',frost:'#a5d9ff',galaxy:'#f897ff'}[data.selectedTrail]||null}
 function claimableCount(){return rewards.filter(r=>r.needed()&&!data.claimed[claimId(r)]).length}
 const rewardInfo={
  first:{icon:'🚀',requirement:'Complete your first run'},rising:{icon:'⭐',requirement:'Reach 5,000 points'},
@@ -140,11 +153,13 @@ function panel(){
  '<p style="margin-top:24px">ACHIEVEMENTS · '+unlocks.filter(a=>a[1]).length+'/'+unlocks.length+' unlocked · ✦ '+format(dustBalance())+' stardust collected</p>'+
  rewards.map(rewardRow).join('')+
  '<p>Equip unlocked thruster trails (cosmetic reward)</p>'+
- '<div class="orbit-exp-row"><label for="orbit-trail-choice">Ship trail</label><select id="orbit-trail-choice" style="background:#171e3b;color:#fff;border:1px solid #7bdefc;border-radius:8px;padding:8px">'+[['standard','Standard'],['azure','Azure'],['solar','Solar'],['nebula','Nebula'],['royal','Royal']].filter(a=>ownTrail(a[0])).map(a=>'<option value="'+a[0]+'" '+(data.selectedTrail===a[0]?'selected':'')+'>'+a[1]+'</option>').join('')+'</select></div>'+
+ '<div class="orbit-exp-row"><label for="orbit-trail-choice">Ship trail</label><select id="orbit-trail-choice" style="background:#171e3b;color:#fff;border:1px solid #7bdefc;border-radius:8px;padding:8px">'+[['standard','Standard'],['azure','Azure'],['solar','Solar'],['nebula','Nebula'],['royal','Royal'],...shopItems.map(a=>[a.id,a.title])].filter(a=>ownTrail(a[0])).map(a=>'<option value="'+a[0]+'" '+(data.selectedTrail===a[0]?'selected':'')+'>'+a[1]+'</option>').join('')+'</select></div>'+
+ '<h3 style="margin:24px 0 5px;color:#83f1ff">✦ STARDUST SHOP</h3><p>Spend your mission rewards on exclusive cosmetic thruster trails. No gameplay advantage.</p><div class="orbit-exp-row"><span>Available Stardust</span><b>✦ '+format(dustBalance())+'</b></div>'+shopItems.map(item=>{const owned=!!data.purchased[item.id];return '<div class="orbit-exp-row"><div class="orbit-shop-item"><div class="orbit-shop-icon" style="border-color:'+item.color+';color:'+item.color+'">'+item.icon+'</div><span><strong>'+item.title+'</strong><small>Permanent collectible trail</small><span class="orbit-shop-price">✦ '+format(item.cost)+'</span></span></div>'+(owned?'<b>OWNED ✓</b>':'<button type="button" class="orbit-exp-button orbit-shop-action" data-shop="'+item.id+'" '+(data.stardust<item.cost?'disabled':'')+'>BUY</button>')+'</div>'}).join('')+
  '<div style="display:flex;gap:9px;margin-top:17px"><button class="orbit-exp-button primary" id="orbit-exp-share" type="button" style="flex:1">↗ SHARE SCORE</button><button class="orbit-exp-button" id="orbit-exp-play" type="button">PLAY ▶</button></div>'+
  '<p style="text-align:center;font-size:11px;margin:16px 0 0">Hold to orbit • Release to launch • Dodge closely to charge Hyper Pulse during bosses.</p>';
  card.querySelector('#orbit-exp-close').onclick=close;
  card.querySelectorAll('.orbit-claim').forEach(btn=>btn.onclick=()=>claimReward(btn.dataset.reward));
+ card.querySelectorAll('.orbit-shop-action').forEach(btn=>btn.onclick=()=>buyItem(btn.dataset.shop));
  card.querySelector('#orbit-trail-choice').onchange=e=>{const choice=e.target.value;if(ownTrail(choice)){data.selectedTrail=choice;persist();notify('SHIP TRAIL EQUIPPED',choice.toUpperCase())}};
  card.querySelector('#orbit-exp-play').onclick=close;
  card.querySelector('#orbit-exp-share').onclick=async()=>{
@@ -179,5 +194,5 @@ function observe(){
 }
 setInterval(observe,500);
 addEventListener('pagehide',persist);
-window.ORBIT_EXP_DEBUG={version:'2.1',refresh:panel,claim:claimReward};
+window.ORBIT_EXP_DEBUG={version:'3.0',refresh:panel,claim:claimReward};
 })();
