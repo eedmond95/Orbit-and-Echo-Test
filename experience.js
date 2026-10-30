@@ -2,7 +2,7 @@
 (()=>{
 'use strict';
 if(window.ORBIT_EXPERIENCE_VERSION)return;
-window.ORBIT_EXPERIENCE_VERSION='2.0';
+window.ORBIT_EXPERIENCE_VERSION='2.1';
 const doc=document, root=doc.body;
 const style=doc.createElement('style');
 style.textContent=`
@@ -22,6 +22,13 @@ style.textContent=`
 #orbit-exp-toast{position:fixed;z-index:960;top:calc(78px + env(safe-area-inset-top));left:50%;transform:translate(-50%,-20px);width:max-content;max-width:88vw;box-sizing:border-box;padding:12px 19px;border:1px solid #98fff5a0;border-radius:16px;background:linear-gradient(115deg,#081a2cf5,#26143af5);color:#f1feff;text-align:center;font:800 13px system-ui;box-shadow:0 0 35px #79fff944;opacity:0;pointer-events:none;transition:opacity .2s,transform .25s}
 #orbit-exp-toast.visible{opacity:1;transform:translate(-50%,0)}
 #orbit-exp-fx{position:fixed;inset:0;z-index:850;pointer-events:none}
+.orbit-reward-card{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.orbit-reward-icon{width:43px;height:43px;flex:none;border:1px solid #86dfff73;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#213957,#231532);font-size:22px}
+.orbit-reward-detail{flex:1;min-width:0}.orbit-reward-detail strong{display:block;font-size:13px;color:#fff}
+.orbit-reward-req{font-size:11px;color:#a6b7d0;margin:3px 0}
+.orbit-reward-prize{font-size:11px;color:#ffdda0;line-height:1.5}
+.orbit-reward-swatch{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-2px;border:1px solid #fff9;margin-left:4px;box-shadow:0 0 9px currentColor}
+.orbit-exp-row-achievement .orbit-exp-button{flex:none;font-size:11px;padding:10px}
 @media(max-width:450px){#orbit-experience-toggle{font-size:10px;padding:9px 11px}#orbit-experience-card{padding:18px}}
 @media(prefers-reduced-motion:reduce){#orbit-exp-toast,.orbit-exp-progress>div{transition:none}}
 `;
@@ -52,6 +59,19 @@ function claimReward(id){
 }
 function selectedColor(){return {azure:'#80faff',solar:'#ffdc65',nebula:'#cd80ff',royal:'#ff7b9b'}[data.selectedTrail]||null}
 function claimableCount(){return rewards.filter(r=>r.needed()&&!data.claimed[claimId(r)]).length}
+const rewardInfo={
+ first:{icon:'🚀',requirement:'Complete your first run'},rising:{icon:'⭐',requirement:'Reach 5,000 points'},
+ master:{icon:'🪐',requirement:'Reach 15,000 points'},legend:{icon:'👑',requirement:'Reach 50,000 points'},
+ daily:{icon:'🌠',requirement:'Complete today’s score challenge'}
+};
+function rewardRow(r){
+ const done=!!data.claimed[claimId(r)],earned=r.needed(),info=rewardInfo[r.id];
+ const trail=r.trail?r.trail.charAt(0).toUpperCase()+r.trail.slice(1)+' Trail':'';
+ const color=r.trail?({azure:'#80faff',solar:'#ffdc65',nebula:'#cd80ff',royal:'#ff7b9b'}[r.trail]):'';
+ const prize='✦ '+format(r.dust)+' Stardust'+(trail?' + '+trail+' <span class="orbit-reward-swatch" style="background:'+color+';color:'+color+'"></span>':'');
+ const action=done?'<b>CLAIMED ✓</b>':earned?'<button class="orbit-exp-button primary orbit-claim" data-reward="'+r.id+'" type="button">CLAIM</button>':'<b>LOCKED</b>';
+ return '<div class="orbit-exp-row orbit-exp-row-achievement"><div class="orbit-reward-card"><div class="orbit-reward-icon" aria-hidden="true">'+info.icon+'</div><div class="orbit-reward-detail"><strong>'+r.name+'</strong><div class="orbit-reward-req">'+info.requirement+'</div><div class="orbit-reward-prize">PRIZE: '+prize+'</div></div></div>'+action+'</div>';
+}
 
 const dateKey=()=>{let d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 if(data.daily!==dateKey()){data.daily=dateKey();data.dailyBest=0}
@@ -118,7 +138,7 @@ function panel(){
  '<div class="orbit-exp-row"><span>🌠 Daily challenge<br><small style="color:#9baec6">Score '+format(dailyTarget)+' points today</small></span><b>'+format(data.dailyBest)+' / '+format(dailyTarget)+'</b></div>'+
  '<div class="orbit-exp-progress"><div style="width:'+progress+'%"></div></div>'+
  '<p style="margin-top:24px">ACHIEVEMENTS · '+unlocks.filter(a=>a[1]).length+'/'+unlocks.length+' unlocked · ✦ '+format(dustBalance())+' stardust collected</p>'+
- rewards.map(r=>{const done=!!data.claimed[claimId(r)],earned=r.needed();return '<div class="orbit-exp-row"><span>'+(earned?'✨':'🔒')+' <strong>'+r.name+'</strong><br><small style="color:#a9c3de">'+r.prize+'</small></span>'+(done?'<b>CLAIMED ✓</b>':earned?'<button class="orbit-exp-button primary orbit-claim" data-reward="'+r.id+'" type="button">CLAIM</button>':'<b>LOCKED</b>')+'</div>'}).join('')+
+ rewards.map(rewardRow).join('')+
  '<p>Equip unlocked thruster trails (cosmetic reward)</p>'+
  '<div class="orbit-exp-row"><label for="orbit-trail-choice">Ship trail</label><select id="orbit-trail-choice" style="background:#171e3b;color:#fff;border:1px solid #7bdefc;border-radius:8px;padding:8px">'+[['standard','Standard'],['azure','Azure'],['solar','Solar'],['nebula','Nebula'],['royal','Royal']].filter(a=>ownTrail(a[0])).map(a=>'<option value="'+a[0]+'" '+(data.selectedTrail===a[0]?'selected':'')+'>'+a[1]+'</option>').join('')+'</select></div>'+
  '<div style="display:flex;gap:9px;margin-top:17px"><button class="orbit-exp-button primary" id="orbit-exp-share" type="button" style="flex:1">↗ SHARE SCORE</button><button class="orbit-exp-button" id="orbit-exp-play" type="button">PLAY ▶</button></div>'+
@@ -159,5 +179,5 @@ function observe(){
 }
 setInterval(observe,500);
 addEventListener('pagehide',persist);
-window.ORBIT_EXP_DEBUG={version:'2.0',refresh:panel,claim:claimReward};
+window.ORBIT_EXP_DEBUG={version:'2.1',refresh:panel,claim:claimReward};
 })();
