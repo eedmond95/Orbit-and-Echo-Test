@@ -13,7 +13,7 @@
 
   const bosses = [
     {name:'RIFT HYDRA', tag:'SERPENT OF THE FRACTURE', hue:'#fb487b',
-     tip:'DODGE THE SWEEPING RIFT • AUTO FIRE', brief:'Lyra: Its sweep has a warning. Slip past it!'},
+     tip:'ALIGN WITH HYDRA • STRAIGHT SHOTS ONLY', brief:'Lyra: Aim directly beneath its heads! Shots fly straight!'},
     {name:'PRISM WARDEN', tag:'THE MIRROR SENTINEL', hue:'#7b8cff',
      tip:'WAIT FOR THE OPEN CORE • TAP FOR PULSE', brief:'Lyra: Its mirrors shut! Shoot when the core glows!'},
     {name:'NULL REAPER', tag:'THE PHANTOM HUNTER', hue:'#bf64ff',
@@ -321,7 +321,7 @@
     b.exposed=b.type!==1 || (b.t%150>=53 && b.t%150<116);
     b.weakIndex=Math.floor(b.t/125)%3;
 
-    // Auto-aim protects one-thumb accessibility; precision still matters when dodging.
+    // Hydra uses fixed vertical shots and demands horizontal alignment; other bosses retain their distinct targeting.
     if(--m.fireCd<=0) {
       m.fireCd=Math.max(6,Math.round(10-Math.min(3,m.gate.level*.12)));
       const wx=b.type===3?b.x+(b.weakIndex-1)*34:b.x;
@@ -329,7 +329,7 @@
       for(const off of [-7,7]) {
         const dx=wx-m.ship.x+off,dy=wy-m.ship.y;
         const mag=Math.hypot(dx,dy)||1;
-        m.bullets.push({x:m.ship.x+off,y:m.ship.y-14,vx:dx/mag*13,vy:dy/mag*13,damage:1.6+m.gate.level*.065});
+        m.bullets.push({x:m.ship.x+off,y:m.ship.y-14,vx:b.type===0?0:dx/mag*13,vy:b.type===0?-13:dy/mag*13,damage:1.6+m.gate.level*.065});
       }
     }
     for(const bullet of m.bullets) {
