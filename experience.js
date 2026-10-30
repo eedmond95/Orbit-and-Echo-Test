@@ -2,12 +2,13 @@
 (()=>{
 'use strict';
 if(window.ORBIT_EXPERIENCE_VERSION)return;
-window.ORBIT_EXPERIENCE_VERSION='3.0';
+window.ORBIT_EXPERIENCE_VERSION='3.1';
 const doc=document, root=doc.body;
 const style=doc.createElement('style');
 style.textContent=`
 #orbit-experience-toggle{position:fixed;z-index:901;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));border:1px solid #79e8ff77;border-radius:24px;color:#e5fbff;background:#091326dc;backdrop-filter:blur(14px);font:700 11px/1.2 system-ui;padding:10px 13px;box-shadow:0 4px 23px #0008;cursor:pointer;touch-action:manipulation}
 #orbit-experience-toggle:active{transform:scale(.95)}
+#orbit-shop-toggle{position:fixed;z-index:902;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));border:1px solid #ffdb7777;border-radius:24px;color:#ffeebc;background:#19132cde;backdrop-filter:blur(14px);font:800 11px system-ui;padding:10px 13px;box-shadow:0 4px 23px #0008;cursor:pointer;touch-action:manipulation}
 #orbit-experience-panel{position:fixed;z-index:9998;inset:0;display:none;align-items:center;justify-content:center;padding:18px;background:#020611d9;backdrop-filter:blur(12px);font-family:system-ui;color:#e8f8ff}
 #orbit-experience-panel.open{display:flex}
 #orbit-experience-card{width:min(100%,420px);max-height:min(85vh,730px);overflow:auto;border:1px solid #6be9ff66;border-radius:24px;background:linear-gradient(154deg,#14213d,#0c1025 55%,#160f2c);box-shadow:0 0 65px #6c59ff33;padding:23px;box-sizing:border-box}
@@ -91,6 +92,7 @@ if(data.daily!==dateKey()){data.daily=dateKey();data.dailyBest=0}
 const persist=()=>{try{localStorage.setItem(storageKey,JSON.stringify(data))}catch(_){}};
 const el=(tag,id)=>{const node=doc.createElement(tag);if(id)node.id=id;return node};
 const toggle=el('button','orbit-experience-toggle');toggle.type='button';toggle.textContent='✦ MISSIONS';toggle.setAttribute('aria-label','View missions and achievements');root.appendChild(toggle);
+const shopToggle=el('button','orbit-shop-toggle');shopToggle.type='button';shopToggle.textContent='✦ SHOP';shopToggle.setAttribute('aria-label','Open Stardust Shop');root.appendChild(shopToggle);
 const backdrop=el('div','orbit-experience-panel'),card=el('section','orbit-experience-card');card.setAttribute('role','dialog');card.setAttribute('aria-modal','true');card.setAttribute('aria-label','Orbit and Echo missions');
 backdrop.appendChild(card);root.appendChild(backdrop);
 const toast=el('div','orbit-exp-toast');toast.setAttribute('role','status');root.appendChild(toast);
@@ -154,7 +156,7 @@ function panel(){
  rewards.map(rewardRow).join('')+
  '<p>Equip unlocked thruster trails (cosmetic reward)</p>'+
  '<div class="orbit-exp-row"><label for="orbit-trail-choice">Ship trail</label><select id="orbit-trail-choice" style="background:#171e3b;color:#fff;border:1px solid #7bdefc;border-radius:8px;padding:8px">'+[['standard','Standard'],['azure','Azure'],['solar','Solar'],['nebula','Nebula'],['royal','Royal'],...shopItems.map(a=>[a.id,a.title])].filter(a=>ownTrail(a[0])).map(a=>'<option value="'+a[0]+'" '+(data.selectedTrail===a[0]?'selected':'')+'>'+a[1]+'</option>').join('')+'</select></div>'+
- '<h3 style="margin:24px 0 5px;color:#83f1ff">✦ STARDUST SHOP</h3><p>Spend your mission rewards on exclusive cosmetic thruster trails. No gameplay advantage.</p><div class="orbit-exp-row"><span>Available Stardust</span><b>✦ '+format(dustBalance())+'</b></div>'+shopItems.map(item=>{const owned=!!data.purchased[item.id];return '<div class="orbit-exp-row"><div class="orbit-shop-item"><div class="orbit-shop-icon" style="border-color:'+item.color+';color:'+item.color+'">'+item.icon+'</div><span><strong>'+item.title+'</strong><small>Permanent collectible trail</small><span class="orbit-shop-price">✦ '+format(item.cost)+'</span></span></div>'+(owned?'<b>OWNED ✓</b>':'<button type="button" class="orbit-exp-button orbit-shop-action" data-shop="'+item.id+'" '+(data.stardust<item.cost?'disabled':'')+'>BUY</button>')+'</div>'}).join('')+
+ '<h3 id="orbit-shop-heading" style="margin:24px 0 5px;color:#83f1ff;scroll-margin-top:12px">✦ STARDUST SHOP</h3><p>Spend your mission rewards on exclusive cosmetic thruster trails. No gameplay advantage.</p><div class="orbit-exp-row"><span>Available Stardust</span><b>✦ '+format(dustBalance())+'</b></div>'+shopItems.map(item=>{const owned=!!data.purchased[item.id];return '<div class="orbit-exp-row"><div class="orbit-shop-item"><div class="orbit-shop-icon" style="border-color:'+item.color+';color:'+item.color+'">'+item.icon+'</div><span><strong>'+item.title+'</strong><small>Permanent collectible trail</small><span class="orbit-shop-price">✦ '+format(item.cost)+'</span></span></div>'+(owned?'<b>OWNED ✓</b>':'<button type="button" class="orbit-exp-button orbit-shop-action" data-shop="'+item.id+'" '+(data.stardust<item.cost?'disabled':'')+'>BUY</button>')+'</div>'}).join('')+
  '<div style="display:flex;gap:9px;margin-top:17px"><button class="orbit-exp-button primary" id="orbit-exp-share" type="button" style="flex:1">↗ SHARE SCORE</button><button class="orbit-exp-button" id="orbit-exp-play" type="button">PLAY ▶</button></div>'+
  '<p style="text-align:center;font-size:11px;margin:16px 0 0">Hold to orbit • Release to launch • Dodge closely to charge Hyper Pulse during bosses.</p>';
  card.querySelector('#orbit-exp-close').onclick=close;
@@ -169,7 +171,8 @@ function panel(){
   else notify('SHARE THIS SCORE',format(data.best))}catch(e){if(e.name!=='AbortError')notify('SHARE UNAVAILABLE')}
  };
 }
-toggle.onclick=()=>{panel();backdrop.classList.add('open')};
+toggle.onclick=()=>{panel();backdrop.classList.add('open');card.scrollTop=0};
+shopToggle.onclick=()=>{panel();backdrop.classList.add('open');const header=card.querySelector('#orbit-shop-heading');if(header)header.scrollIntoView({block:'start',behavior:'instant'});};
 backdrop.addEventListener('pointerdown',e=>{if(e.target===backdrop)close()});
 doc.addEventListener('keydown',e=>{if(e.key==='Escape'&&backdrop.classList.contains('open'))close()});
 function observe(){
@@ -189,10 +192,11 @@ function observe(){
  const pending=claimableCount();toggle.textContent=pending?'✦ MISSIONS • '+pending+' REWARDS':'✦ MISSIONS';
  // Keep controls away from combat and preserve original game's pointer interactions.
  toggle.style.display=st==='MINIGAME'?'none':'block';
+ shopToggle.style.display=st==='MINIGAME'?'none':'block';
  if(!backdrop.classList.contains('open')&&st!==previousState&&st==='MENU')persist();
  previousState=st;
 }
 setInterval(observe,500);
 addEventListener('pagehide',persist);
-window.ORBIT_EXP_DEBUG={version:'3.0',refresh:panel,claim:claimReward};
+window.ORBIT_EXP_DEBUG={version:'3.1',refresh:panel,claim:claimReward};
 })();
