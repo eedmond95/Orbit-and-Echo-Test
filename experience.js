@@ -86,10 +86,11 @@ const close=()=>{backdrop.classList.remove('open');toggle.focus()};
 const trailCanvas=el('canvas','orbit-reward-trail');trailCanvas.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:95';root.appendChild(trailCanvas);
 const trailCtx=trailCanvas.getContext('2d');let trailFrame=0;
 function drawTrail(){
- if(!trailCtx||data.selectedTrail==='standard')return;
- const st=getState();if(!['PLAYING','GAME','PLAY','MINIGAME'].includes(st))return;
+ if(!trailCtx)return;
+ if(data.selectedTrail==='standard'){trailCtx.clearRect(0,0,trailCanvas.width,trailCanvas.height);return;}
+ const st=getState();if(!['PLAYING','GAME','PLAY','MINIGAME'].includes(st)){trailCtx.clearRect(0,0,trailCanvas.width,trailCanvas.height);return;}
  let ship=null;try{if(typeof mg!=='undefined'&&mg&&mg.ship)ship=mg.ship}catch(_){}
- if(!ship)return;
+ if(!ship){trailCtx.clearRect(0,0,trailCanvas.width,trailCanvas.height);return;}
  const dpr=Math.min(devicePixelRatio||1,2), w=innerWidth,h=innerHeight;
  if(trailCanvas.width!==Math.round(w*dpr)||trailCanvas.height!==Math.round(h*dpr)){trailCanvas.width=Math.round(w*dpr);trailCanvas.height=Math.round(h*dpr)}
  trailCtx.clearRect(0,0,trailCanvas.width,trailCanvas.height);
@@ -113,7 +114,7 @@ function panel(){
  '<div class="orbit-exp-row"><span>🏆 Personal best</span><b>'+format(data.best)+'</b></div>'+
  '<div class="orbit-exp-row"><span>🚀 Runs launched</span><b>'+format(data.runs)+'</b></div>'+
  '<div class="orbit-exp-row"><span>⭐ Highest sector</span><b>'+format(data.sector)+'</b></div>'+
- '<div class="orbit-exp-row"><span>🌠 Daily challenge<br><small style="color:#9baec6">Score '+format(dailyTarget)+' points today</small></span><b>'+format(data.dailyBest)+' / '+format(dailyGoal)+'</b></div>'+
+ '<div class="orbit-exp-row"><span>🌠 Daily challenge<br><small style="color:#9baec6">Score '+format(dailyTarget)+' points today</small></span><b>'+format(data.dailyBest)+' / '+format(dailyTarget)+'</b></div>'+
  '<div class="orbit-exp-progress"><div style="width:'+progress+'%"></div></div>'+
  '<p style="margin-top:24px">ACHIEVEMENTS · '+unlocks.filter(a=>a[1]).length+'/'+unlocks.length+' unlocked · ✦ '+format(dustBalance())+' stardust earned</p>'+
  rewards.map(r=>{const done=!!data.claimed[claimId(r)],earned=r.needed();return '<div class="orbit-exp-row"><span>'+(earned?'✨':'🔒')+' <strong>'+r.name+'</strong><br><small style="color:#a9c3de">'+r.prize+'</small></span>'+(done?'<b>CLAIMED ✓</b>':earned?'<button class="orbit-exp-button primary orbit-claim" data-reward="'+r.id+'" type="button">CLAIM</button>':'<b>LOCKED</b>')+'</div>'}).join('')+
@@ -141,7 +142,7 @@ function observe(){
  const playing=st==='PLAYING'||st==='GAME'||st==='PLAY'||st==='MINIGAME';
  if(playing&&!roundActive){roundActive=true;roundTop=s;data.runs++;persist()}
  if(roundActive){roundTop=Math.max(roundTop,s)}
- if(playing&&s>data.best){data.best=s;if(s%300<30)persist()}
+ if(playing&&s>data.best){data.best=s;persist()}
  if(playing&&s>data.dailyBest){data.dailyBest=s}
  if(lv>data.sector&&lv<10000){data.sector=lv;persist();if(lv>2)notify('SECTOR '+lv+' REACHED','Keep the momentum!',true)}
  const marks=[1000,3000,5000,10000,20000,50000,100000];
