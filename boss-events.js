@@ -34,7 +34,7 @@
     if (gate.bossPending && !gate.bossCleared) return beginBoss(gate);
     const result = previousEnter.apply(this, arguments);
     // Keep the first sectors welcoming, then increase the pressure.
-    if (mg && gate.level >= 8) mg.shields = 2;
+    if (mg && gate.level >= 8) mg.shields = gate.level >= 18 ? 1 : 2;
     return result;
   };
 
@@ -85,12 +85,12 @@
   function beginBoss(gate) {
     clearCheer();
     isHolding = false;
-    const index = Math.floor((clearedMiniGames - 1) / 2) % bosses.length;
+    const index = defeatedBosses % bosses.length;
     const kind = Math.max(0, index);
     const def = bosses[kind];
     const fw = Math.min(width, 560);
     const fx = (width - fw) / 2;
-    const maxHp = Math.round(190 + 43 * gate.level);
+    const maxHp = Math.round(190 + 43 * gate.level + Math.max(0, defeatedBosses - 3) * 70);
     mg = {
       gate, game: {name:def.name, brief:def.brief, hint:def.tip}, type:'boss', tint:gate.tint,
       phase:'warning', t:0, time:3300,
@@ -162,15 +162,15 @@
     if(b.hp<=0) endBoss(true);
   }
   window.addEventListener('keydown',e=>{
-    if (mg && mg.type==='boss' && e.code==='KeyE' && !e.repeat) {
+    if (mg && mg.type==='boss' && (e.code==='KeyE' || e.code==='Space') && !e.repeat) {
       e.preventDefault(); mg.tapped=true;
     }
   });
 
   function tickBossAttacks() {
     const b=mg.boss, kind=b.type;
-    const hard=1+Math.min(2.15,mg.gate.level*0.075);
-    const sp=2.45+Math.min(3.4,mg.gate.level*0.17);
+    const hard=1+Math.min(2.65,mg.gate.level*0.075 + defeatedBosses*0.035);
+    const sp=2.45+Math.min(4.4,mg.gate.level*0.17 + defeatedBosses*0.06);
     if (--b.attackCd>0) return;
     b.attackCd=Math.max(38,Math.round((kind===3 ? 133 : 111)/hard));
     if (kind===0) {
@@ -509,5 +509,5 @@
     ctx.restore();
   }
   // A tiny debug hook supports automated tests without exposing gameplay controls.
-  window.ORBIT_BOSS_VERSION='1.0';
+  window.ORBIT_BOSS_VERSION='1.1';
 })();
