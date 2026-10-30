@@ -23,13 +23,13 @@
   (async function () {
     const display = document.getElementById('loading');
     try {
-      const response = await fetch('./game-original.html');
+      const response = await fetch('./game-original.html?v=3.2', {cache:'no-store'});
       if (!response.ok) throw new Error('Game source returned ' + response.status);
       let page = await response.text();
       if (!/<\/body>/i.test(page)) throw new Error('Invalid game source');
       // Load the expansion after the original non-module engine: its game state,
       // pilots, physics, leaderboard, and artwork remain unchanged.
-      const expansionTag = '<script src="./boss-events.js?v=3.1"></' + 'script>' + '<script src="./experience.js?v=1.0"></' + 'script>';
+      const expansionTag = '<script src="./boss-events.js?v=3.2"></' + 'script>' + '<script src="./experience.js?v=1.1"></' + 'script>';
       page = page.replace(/<\/body>/i, expansionTag + '\n</body>');
       document.open();
       document.write(page);
