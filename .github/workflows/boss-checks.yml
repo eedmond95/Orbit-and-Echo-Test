@@ -1,0 +1,19 @@
+name: Boss invasion checks
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  game-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check boss script syntax
+        run: node --check boss-events.js
+      - name: Test boss progression and rewards
+        run: node --test tests/boss-events.test.mjs
