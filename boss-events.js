@@ -508,6 +508,90 @@
     ctx.restore();
   }
 
+
+  // Boss portraits V2: large independent silhouettes instead of small additions
+  // to the original polygon sprites. All artwork is procedural canvas vector art.
+  function drawBossPortrait(b){
+    const c=b.def.hue, t=b.t, rage=b.ragePhase===3, pulse=1+.035*Math.sin(t*.08);
+    ctx.save();ctx.translate(b.x,b.y);ctx.scale(pulse,pulse);
+    ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.shadowBlur=rage?40:24;ctx.shadowColor=rage?'#ff244a':c;
+    ctx.lineWidth=3.2;ctx.strokeStyle=rage?'#ff284d':c;ctx.fillStyle='#090716';
+    const shape=(pts,fill)=>{ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=fill||'#090716';ctx.fill();ctx.stroke();};
+    const eye=(x,y,r=5)=>{ctx.fillStyle=rage?'#fff5a0':'#ff315f';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=22;};
+    if(b.type===0){
+      // HYDRA: three dragon heads, jagged spines, hanging serpent body.
+      for(let i=5;i>=0;i--){
+        const w=19+i*2, yy=34+i*20, xx=Math.sin(t*.025-i*.72)*23;
+        shape([[xx-w,yy-18],[xx-9,yy-25],[xx+9,yy-25],[xx+w,yy-18],[xx+17,yy+5],[xx,yy+17],[xx-17,yy+5]],i%2?'#260c22':'#3f102b');
+        shape([[xx-18,yy-10],[xx-29,yy-25],[xx-7,yy-13]],'#bf2251');
+        shape([[xx+18,yy-10],[xx+29,yy-25],[xx+7,yy-13]],'#bf2251');
+      }
+      for(const d of [-1,1]){
+        ctx.save();ctx.translate(d*52,1+Math.sin(t*.045+d)*9);ctx.rotate(d*.2);
+        shape([[-29,-26],[-35,-61],[-17,-42],[0,-75],[18,-41],[33,-60],[28,-21],[34,0],[17,24],[-14,23],[-35,2]],'#220c29');
+        shape([[-23,7],[-8,0],[8,0],[25,7],[13,30],[0,39],[-13,30]],'#490c28');
+        for(let j=-1;j<=1;j++)shape([[j*9-3,20],[j*9+3,20],[j*9,32]],'#ffecdd');
+        eye(-13,-13,6);eye(13,-13,6);ctx.restore();
+      }
+      shape([[-34,-35],[-42,-77],[-21,-56],[0,-92],[21,-56],[42,-77],[34,-35],[44,7],[22,36],[0,53],[-22,36],[-44,7]],'#26091e');
+      shape([[-26,18],[0,10],[26,18],[16,42],[0,53],[-16,42]],'#5e0d33');
+      for(const d of [-1,1]){eye(d*18,-11,7);shape([[d*12,20],[d*3,36],[d*24,30]],'#ffeed9');}
+      ctx.fillStyle='#ff426c';ctx.beginPath();ctx.ellipse(0,-37,7,12,0,0,7);ctx.fill();
+    }else if(b.type===1){
+      // WARDEN: floating crowned face with terrifying red iris and blades.
+      ctx.strokeStyle='#8f73ff';ctx.lineWidth=6;
+      ctx.setLineDash([32,11,8,16]);ctx.beginPath();ctx.arc(0,0,105,t*.009,t*.009+Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+      ctx.strokeStyle=rage?'#ff284d':c;ctx.lineWidth=3;
+      for(let i=0;i<8;i++){
+        const a=i*Math.PI/4-t*.012, rr=85;
+        ctx.save();ctx.translate(Math.cos(a)*rr,Math.sin(a)*rr);ctx.rotate(a);
+        shape([[-12,0],[0,-38],[13,0],[0,21]],'#260e40');ctx.restore();
+      }
+      shape([[-55,-29],[-67,-75],[-31,-52],[0,-89],[31,-52],[67,-75],[55,-29],[45,40],[0,73],[-45,40]],'#160e38');
+      shape([[-42,-9],[-23,-31],[0,-19],[23,-31],[42,-9],[28,32],[0,51],[-28,32]],'#322054');
+      ctx.strokeStyle='#f6b4ff';ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(0,0,32,b.exposed?23:8,0,0,7);ctx.stroke();
+      if(b.exposed){ctx.fillStyle='#fce6ff';ctx.beginPath();ctx.arc(0,0,20,0,7);ctx.fill();eye(0,0,11);}
+      else{ctx.fillStyle='#ff4266';ctx.fillRect(-25,-3,50,6);}
+      ctx.strokeStyle='#a093ff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-23,38);ctx.lineTo(0,50);ctx.lineTo(23,38);ctx.stroke();
+    }else if(b.type===2){
+      // REAPER: massive hooded demon, bone mask, scythe, shadow wings.
+      for(const d of [-1,1]){
+        shape([[d*30,-25],[d*86,-74],[d*74,-20],[d*120,16],[d*82,31],[d*125,65],[d*61,49],[d*22,89]],'#160b2c');
+      }
+      shape([[-54,30],[-70,-62],[-43,-109],[-19,-64],[0,-123],[19,-64],[43,-109],[70,-62],[54,30],[68,91],[25,68],[0,102],[-25,68],[-68,91]],'#10091f');
+      shape([[-38,-36],[-19,-61],[0,-68],[19,-61],[38,-36],[29,12],[14,35],[-14,35],[-29,12]],'#e0d4ee');
+      shape([[-22,14],[0,34],[22,14],[0,6]],'#190721');
+      for(const d of [-1,1]){shape([[d*5,-25],[d*26,-35],[d*19,-12]],'#e91873');eye(d*16,-22,4);}
+      ctx.strokeStyle='#c7a4ff';ctx.lineWidth=6;
+      ctx.beginPath();ctx.moveTo(64,110);ctx.lineTo(99,-97);ctx.stroke();
+      ctx.strokeStyle='#ee64ff';ctx.lineWidth=9;ctx.beginPath();ctx.arc(97,-88,47,-2.75,.3);ctx.stroke();
+    }else{
+      // TITAN: enormous armored infernal warhead with furnace maw.
+      for(const d of [-1,1]){
+        shape([[d*40,-30],[d*59,-74],[d*79,-96],[d*71,-44],[d*101,-50],[d*112,17],[d*83,40],[d*53,23]],'#332022');
+        shape([[d*72,-45],[d*95,-45],[d*99,6],[d*76,8]],'#140d13');
+        ctx.fillStyle='#ff522b';ctx.fillRect(d*87-9,-33,18,24);
+        shape([[d*43,46],[d*75,50],[d*83,109],[d*43,86]],'#3a1f24');
+      }
+      shape([[-54,-65],[-36,-101],[0,-78],[36,-101],[54,-65],[65,33],[36,83],[-36,83],[-65,33]],'#29202a');
+      shape([[-46,-32],[0,-56],[46,-32],[36,1],[0,9],[-36,1]],'#5e2830');
+      eye(-21,-25,9);eye(21,-25,9);
+      shape([[-32,21],[0,10],[32,21],[26,61],[0,78],[-26,61]],'#ff572a');
+      for(let i=-3;i<=3;i++)shape([[i*8-4,31],[i*8+3,31],[i*8,49]],'#ffe1a3');
+      ctx.strokeStyle='#ffbb47';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-25,11);ctx.lineTo(-33,48);ctx.moveTo(25,11);ctx.lineTo(33,48);ctx.stroke();
+      // Preserve clearly visible glowing vent targets.
+      for(let i=-1;i<=1;i++){ctx.fillStyle=b.weakIndex===i+1?'#fff8ad':'#7a3531';ctx.fillRect(i*34-8,6,16,13);}
+    }
+    if(b.ragePhase>=2){
+      ctx.strokeStyle=rage?'#ff234e':c;ctx.lineWidth=rage?5:3;
+      ctx.globalAlpha=.45+.15*Math.sin(t*.15);
+      ctx.beginPath();ctx.arc(0,0,119+t%19,0,Math.PI*2);ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function hudText(str,x,y,max,size,color,align) {
     ctx.textAlign=align||'left';ctx.textBaseline='middle';ctx.fillStyle=color;
     fillFitText(str,x,y,max,size,800);
@@ -530,8 +614,7 @@
         ctx.lineWidth=active?3:1;
         ctx.strokeRect(h.x-h.w/2,0,h.w,height);
       }
-      drawBossShape(b);
-      drawEvilDetails(b);
+      drawBossPortrait(b);
       for(const bullet of m.bullets) {
         ctx.fillStyle='#8bffff';ctx.shadowColor='#8bffff';ctx.shadowBlur=9;
         ctx.beginPath();ctx.arc(bullet.x,bullet.y,3.7,0,7);ctx.fill();
@@ -576,7 +659,7 @@
     if(m.phase==='warning') {
       ctx.fillStyle='rgba(8,0,13,.88)';ctx.fillRect(0,0,width,height);
       const beat=Math.sin(m.t*.19)>.0;
-      ctx.save();ctx.globalAlpha=.19+.14*Math.sin(m.t*.13);drawEvilDetails(b,true);ctx.restore();
+      ctx.save();ctx.globalAlpha=.18+.14*Math.sin(m.t*.13);ctx.translate(width/2,height*.29);ctx.scale(1.28,1.28);drawBossPortrait({...b,x:0,y:0});ctx.restore();
       ctx.fillStyle=beat?'rgba(255,35,65,.22)':'rgba(255,35,65,.07)';
       ctx.fillRect(0,0,width,height);
       for(let y=0;y<height;y+=18) {
@@ -604,5 +687,5 @@
     ctx.restore();
   }
   // A tiny debug hook supports automated tests without exposing gameplay controls.
-  window.ORBIT_BOSS_VERSION='1.2';
+  window.ORBIT_BOSS_VERSION='2.0';
 })();
