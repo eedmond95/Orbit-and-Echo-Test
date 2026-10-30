@@ -100,7 +100,7 @@
       boss: {
         type:kind, def, hp:maxHp, maxHp, x:width/2, y:clamp(height * 0.23, 118, 190),
         radius:kind === 3 ? 62 : 47, t:0, attackCd:110, meter:20,
-        exposed:true, beat:0, hazards:[], prizes:[], flash:0, pulseFx:0,
+        exposed:true, beat:0, hazards:[], prizes:[], flash:0, pulseFx:0, ragePhase:1, phaseFlash:0, nearMissCd:0,
         safeLane:0, weakIndex:0, lastX:width/2, afterimage:0, projectilesFired:0
       }
     };
@@ -169,8 +169,8 @@
 
   function tickBossAttacks() {
     const b=mg.boss, kind=b.type;
-    const hard=1+Math.min(2.65,mg.gate.level*0.075 + defeatedBosses*0.035);
-    const sp=2.45+Math.min(4.4,mg.gate.level*0.17 + defeatedBosses*0.06);
+    const hard=(1+Math.min(2.65,mg.gate.level*0.075 + defeatedBosses*0.035))*(b.ragePhase===3?1.33:b.ragePhase===2?1.15:1);
+    const sp=(2.45+Math.min(4.4,mg.gate.level*0.17 + defeatedBosses*0.06))*(b.ragePhase===3?1.17:1);
     if (--b.attackCd>0) return;
     b.attackCd=Math.max(38,Math.round((kind===3 ? 133 : 111)/hard));
     if (kind===0) {
@@ -270,6 +270,15 @@
     if(m.invuln>0)m.invuln--;
     if(m.hitFlash>0)m.hitFlash--;
     if(b.flash>0)b.flash--;
+    if(b.phaseFlash>0)b.phaseFlash--;
+    if(b.nearMissCd>0)b.nearMissCd--;
+    const nextPhase=b.hp<=b.maxHp*.30?3:b.hp<=b.maxHp*.65?2:1;
+    if(nextPhase>b.ragePhase){
+      b.ragePhase=nextPhase;b.phaseFlash=105;b.attackCd=Math.max(b.attackCd,72);
+      screenShake=19;eventBeep(nextPhase===3?125:210);
+      mgBurst(b.x,b.y,b.def.hue,34);
+      pilotSay(nextPhase===3?'DANGER! '+b.def.name+' IS ENRAGED!':'Its attack pattern is changing!',{priority:3});
+    }
     if(b.pulseFx>0)b.pulseFx--;
     b.meter=Math.min(100,b.meter+.055);
     if(m.tapped)firePulse();
@@ -303,6 +312,7 @@
         if(b.exposed) {
           b.hp-=bullet.damage;
           b.meter=Math.min(100,b.meter+1.35);
+          if(b.nearMissCd<=0 && b.t%22===0){b.nearMissCd=16; if(b.hp<b.maxHp*.3)screenShake=Math.max(screenShake,3);}
           b.flash=4;
           if(b.t%9===0)mgBurst(bullet.x,bullet.y,b.def.hue,2);
         } else if(b.t%12===0)mgBurst(bullet.x,bullet.y,'#8ea5ff',3);
@@ -419,6 +429,85 @@
     ctx.restore();
   }
 
+  // Vector-only hostile silhouettes: sharp armor, malicious eyes, animated scars.
+  // No images or downloads; scales crisply on phones and desktop.
+  function drawEvilDetails(b, silhouette=false) {
+    const x=b.x, y=b.y, t=b.t, k=b.type;
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.shadowColor=b.ragePhase===3?'#ff174c':b.def.hue;
+    ctx.shadowBlur=b.ragePhase===3?36:19;
+    ctx.lineJoin='round';
+    ctx.strokeStyle=b.ragePhase===3?'#ff476d':b.def.hue;
+    ctx.fillStyle='#0b0716';
+    ctx.lineWidth=3;
+    const horn=(sx,sy,dir,scale=1)=>{
+      ctx.beginPath();ctx.moveTo(sx,sy);
+      ctx.lineTo(sx+dir*18*scale,sy-24*scale);
+      ctx.lineTo(sx+dir*9*scale,sy-46*scale);
+      ctx.lineTo(sx-dir*4*scale,sy-27*scale);
+      ctx.closePath();ctx.fill();ctx.stroke();
+    };
+    if(k===0){
+      // Hydra: crown spines, multiple jaws and a pulsing third eye.
+      for(const dir of [-1,1]){
+        horn(dir*29,-17,dir,1.23);
+        horn(dir*18,-28,dir,.75);
+        ctx.beginPath();ctx.moveTo(dir*13,10);ctx.lineTo(dir*37,25);ctx.lineTo(dir*19,32);
+        ctx.lineTo(dir*6,20);ctx.closePath();ctx.fill();ctx.stroke();
+      }
+      ctx.fillStyle='#ff1749';ctx.beginPath();ctx.ellipse(0,-10,5+Math.sin(t*.15)*2,9,0,0,7);ctx.fill();
+      ctx.strokeStyle='#ffbdc9';ctx.lineWidth=2;
+      for(const dir of [-1,1]){ctx.beginPath();ctx.moveTo(dir*15,25);ctx.lineTo(dir*13,36);ctx.lineTo(dir*5,27);ctx.stroke();}
+    }else if(k===1){
+      // Warden: broken black halo, blade shards and a hostile iris.
+      for(let i=0;i<7;i++){
+        const a=t*.008+i*Math.PI*2/7, r=79+Math.sin(t*.06+i)*5;
+        ctx.save();ctx.translate(Math.cos(a)*r,Math.sin(a)*r);ctx.rotate(a);
+        ctx.beginPath();ctx.moveTo(0,-17);ctx.lineTo(9,2);ctx.lineTo(0,25);ctx.lineTo(-9,2);
+        ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+      }
+      horn(-24,-30,-1,.72);horn(24,-30,1,.72);
+      ctx.strokeStyle=b.exposed?'#ffb7ed':'#ff3565';
+      ctx.lineWidth=4;ctx.beginPath();ctx.ellipse(0,0,24,b.exposed?15:4,0,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle='#ff365d';ctx.beginPath();ctx.arc(0,0,b.exposed?7:4,0,7);ctx.fill();
+    }else if(k===2){
+      // Reaper: horned skull, jagged cloak, scythe and glowing eyes.
+      horn(-30,-25,-1,1.4);horn(30,-25,1,1.4);
+      ctx.fillStyle='#090713';
+      ctx.beginPath();ctx.moveTo(-32,20);ctx.lineTo(-80,74);ctx.lineTo(-43,55);
+      ctx.lineTo(-24,88);ctx.lineTo(0,58);ctx.lineTo(27,91);ctx.lineTo(43,55);
+      ctx.lineTo(83,74);ctx.lineTo(34,20);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle='#ff397e';
+      for(const dir of [-1,1]){ctx.beginPath();ctx.moveTo(dir*4,-10);ctx.lineTo(dir*27,-16);ctx.lineTo(dir*17,-2);ctx.closePath();ctx.fill();}
+      ctx.strokeStyle='#e39bff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(69,70);ctx.lineTo(95,-55);ctx.stroke();
+      ctx.lineWidth=7;ctx.beginPath();ctx.arc(98,-49,31,-2.3,.5);ctx.stroke();
+    }else{
+      // Titan: armored devil-face, shoulder cannons and molten teeth.
+      for(const dir of [-1,1]){
+        horn(dir*41,-38,dir,1.3);
+        ctx.fillStyle='#0e0b10';ctx.fillRect(dir*50-13,-29,26,29);ctx.strokeRect(dir*50-13,-29,26,29);
+        ctx.fillStyle='#ff392d';ctx.fillRect(dir*50-6,-28,12,17);
+        ctx.beginPath();ctx.moveTo(dir*42,8);ctx.lineTo(dir*20,0);ctx.lineTo(dir*16,17);ctx.closePath();ctx.fill();
+      }
+      ctx.fillStyle='#ff3c25';ctx.beginPath();ctx.moveTo(-26,-11);ctx.lineTo(-6,-5);ctx.lineTo(-17,4);ctx.closePath();ctx.fill();
+      ctx.beginPath();ctx.moveTo(26,-11);ctx.lineTo(6,-5);ctx.lineTo(17,4);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='#ffcb73';ctx.lineWidth=3;
+      for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(i*9-3,29);ctx.lineTo(i*9,39);ctx.stroke();}
+    }
+    if(b.ragePhase>=2 && !silhouette){
+      ctx.strokeStyle=b.ragePhase===3?'#ff2657':b.def.hue;
+      ctx.globalAlpha=.35+.25*Math.sin(t*.11);
+      ctx.lineWidth=2;
+      for(let i=0;i<3;i++){
+        const a=t*.042+i*Math.PI*2/3;
+        ctx.beginPath();ctx.moveTo(Math.cos(a)*54,Math.sin(a)*54);
+        ctx.lineTo(Math.cos(a+.15)*74,Math.sin(a+.15)*74);ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   function hudText(str,x,y,max,size,color,align) {
     ctx.textAlign=align||'left';ctx.textBaseline='middle';ctx.fillStyle=color;
     fillFitText(str,x,y,max,size,800);
@@ -442,6 +531,7 @@
         ctx.strokeRect(h.x-h.w/2,0,h.w,height);
       }
       drawBossShape(b);
+      drawEvilDetails(b);
       for(const bullet of m.bullets) {
         ctx.fillStyle='#8bffff';ctx.shadowColor='#8bffff';ctx.shadowBlur=9;
         ctx.beginPath();ctx.arc(bullet.x,bullet.y,3.7,0,7);ctx.fill();
@@ -466,7 +556,7 @@
       }
       ctx.shadowBlur=0;
       // Boss life bar and unique mechanic
-      hudText('BOSS • '+def.name,15,21,width-104,12,'#ffffff');
+      hudText((b.ragePhase===3?'☠ ENRAGED • ':b.ragePhase===2?'⚠ PHASE II • ':'BOSS • ')+def.name,15,21,width-104,12,b.ragePhase===3?'#ff768c':'#ffffff');
       drawPilotBadge(width-34,33,16,m.hitFlash>0?'#ff3969':getActivePilot().color);
       ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(15,40,width-30,12);
       ctx.fillStyle=def.hue;ctx.fillRect(15,40,(width-30)*clamp(b.hp/b.maxHp,0,1),12);
@@ -477,11 +567,16 @@
       ctx.fillStyle='rgba(255,255,255,.17)';ctx.fillRect(mx,height-27,meterW,9);
       ctx.fillStyle=b.meter>=100?'#ffffff':'#64eaff';ctx.fillRect(mx,height-27,meterW*b.meter/100,9);
       hudText(b.meter>=100?'PULSE READY • TAP / SPACE':'PULSE CHARGING '+Math.floor(b.meter)+'%',width/2,height-40,width-20,10,b.meter>=100?'#ffffff':'#9feaff','center');
+      if(b.phaseFlash>0){
+        ctx.save();ctx.globalAlpha=Math.min(.8,b.phaseFlash/80);ctx.fillStyle='rgba(185,8,40,.13)';ctx.fillRect(0,0,width,height);
+        hudText(b.ragePhase===3?'FINAL PHASE — RAMPAGE':'PHASE II — THREAT ESCALATING',width/2,height*.33,width-22,Math.min(20,width*.055),'#ff93ae','center');ctx.restore();
+      }
       if(mgComms&&m.phase==='play') hudText(getActivePilot().name+' ▸ '+mgComms.text,width/2,108,width-32,11,'#dfbcff','center');
     }
     if(m.phase==='warning') {
       ctx.fillStyle='rgba(8,0,13,.88)';ctx.fillRect(0,0,width,height);
       const beat=Math.sin(m.t*.19)>.0;
+      ctx.save();ctx.globalAlpha=.19+.14*Math.sin(m.t*.13);drawEvilDetails(b,true);ctx.restore();
       ctx.fillStyle=beat?'rgba(255,35,65,.22)':'rgba(255,35,65,.07)';
       ctx.fillRect(0,0,width,height);
       for(let y=0;y<height;y+=18) {
@@ -509,5 +604,5 @@
     ctx.restore();
   }
   // A tiny debug hook supports automated tests without exposing gameplay controls.
-  window.ORBIT_BOSS_VERSION='1.1';
+  window.ORBIT_BOSS_VERSION='1.2';
 })();
