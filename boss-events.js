@@ -23,6 +23,29 @@
   ];
   let clearedMiniGames = 0;
   let defeatedBosses = 0;
+  // Dedicated one-thumb boss ability control, independent of drag steering.
+  const pulseButton = document.createElement('button');
+  pulseButton.type='button';
+  pulseButton.setAttribute('aria-label','Hyper pulse boss ability');
+  pulseButton.style.cssText='position:fixed;z-index:1000;right:max(12px,env(safe-area-inset-right));bottom:calc(36px + env(safe-area-inset-bottom));width:82px;height:82px;border-radius:50%;border:2px solid #80faff;background:radial-gradient(circle at 30% 25%,#3a5980,#15102c 75%);color:white;font:900 13px system-ui;letter-spacing:1px;box-shadow:0 0 20px #42dfff88;touch-action:none;display:none';
+  document.body.appendChild(pulseButton);
+  pulseButton.addEventListener('pointerdown',e=>{
+    if(!mg||mg.type!=='boss')return;
+    e.preventDefault();e.stopPropagation();
+    if(mg.phase==='warning'){mg.t=155;return;}
+    if(mg.phase==='play'&&mg.boss.meter>=100){mg.tapped=true;firePulse();mg.tapped=false;}
+  },{passive:false});
+  pulseButton.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();});
+  function syncPulseButton(){
+    const active=!!(mg&&mg.type==='boss');
+    pulseButton.style.display=active?'block':'none';
+    if(!active)return;
+    const ready=mg.phase==='play'&&mg.boss.meter>=100;
+    pulseButton.textContent=mg.phase==='warning'?'SKIP ▶':ready?'✦ PULSE':Math.floor(mg.boss.meter)+'%';
+    pulseButton.disabled=mg.phase!=='warning'&&!ready;
+    pulseButton.style.opacity=ready||mg.phase==='warning'?'1':'.55';
+    pulseButton.style.boxShadow=ready?'0 0 34px #b0ffff,inset 0 0 22px #80ffff':'0 0 15px #42dfff77';
+  }
 
   startGame = function() {
     clearedMiniGames = 0;
@@ -53,7 +76,8 @@
   };
 
   updateMinigame = function() {
-    if (mg && mg.type === 'boss') return updateBoss();
+    if (mg && mg.type === 'boss') { const result=updateBoss();syncPulseButton();return result; }
+    syncPulseButton();
     const before = mg;
     const result = previousUpdate.apply(this, arguments);
     if (!mg || before !== mg || mg.phase !== 'play') return result;
@@ -101,10 +125,11 @@
         type:kind, def, hp:maxHp, maxHp, x:width/2, y:clamp(height * 0.23, 118, 190),
         radius:kind === 3 ? 62 : 47, t:0, attackCd:110, meter:20,
         exposed:true, beat:0, hazards:[], prizes:[], flash:0, pulseFx:0, ragePhase:1, phaseFlash:0, nearMissCd:0,
-        safeLane:0, weakIndex:0, lastX:width/2, afterimage:0, projectilesFired:0
+        safeLane:0, weakIndex:0, lastX:width/2, afterimage:0, projectilesFired:0, grazes:0, combo:0, comboT:0
       }
     };
     gameState = 'MINIGAME';
+    syncPulseButton();
     document.getElementById('hud').classList.add('opacity-0');
     document.getElementById('hudLives').classList.add('opacity-0');
     novaBtn.classList.add('hidden');
@@ -148,6 +173,7 @@
     if (mg.phase!=='play' || mg.boss.meter<100) return;
     const b=mg.boss;
     b.meter=0;
+    b.combo=0;
     b.pulseFx=52;
     b.flash=20;
     b.hp=Math.max(0,b.hp-b.maxHp*0.155);
@@ -221,7 +247,7 @@
       gate.bossCleared=true;
       gate.bossPending=false;
       defeatedBosses++;
-      const points=gate.level*850 + Math.ceil(mg.time/60)*20;
+      const points=gate.level*850 + Math.ceil(mg.time/60)*20 + mg.boss.grazes*35;
       const reward=Math.min(15,3+Math.floor(gate.level/2));
       score+=points;
       gems+=reward;
@@ -229,11 +255,13 @@
       missionStat('score',Math.floor(score),true);
       missionStat('pulses',runGems,true);
       previousExit(true);
+      syncPulseButton();
       showBanner('BOSS DEFEATED','+'+points+' PTS  •  +'+reward+' GEMS','text-yellow-300 neon-text-cyan','Lyra: That is how you clear a sector!');
       return;
     }
     gate.bossPending=true;
     previousExit(false);
+    syncPulseButton();
   }
 
   function updateBoss() {
@@ -272,6 +300,7 @@
     if(b.flash>0)b.flash--;
     if(b.phaseFlash>0)b.phaseFlash--;
     if(b.nearMissCd>0)b.nearMissCd--;
+    if(b.comboT>0)b.comboT--;else b.combo=0;
     const nextPhase=b.hp<=b.maxHp*.30?3:b.hp<=b.maxHp*.65?2:1;
     if(nextPhase>b.ragePhase){
       b.ragePhase=nextPhase;b.phaseFlash=105;b.attackCd=Math.max(b.attackCd,72);
@@ -324,8 +353,13 @@
     tickBossAttacks();
     for(const e of m.enemyBullets) {
       e.x+=e.vx; e.y+=e.vy;
-      if(Math.hypot(e.x-m.ship.x,e.y-m.ship.y)<(e.r||5)+11) {
-        e.dead=true; bossHit();
+      const dist=Math.hypot(e.x-m.ship.x,e.y-m.ship.y);
+      if(dist<(e.r||5)+11) {
+        e.dead=true; bossHit(); b.combo=0;
+      } else if(!e.grazed && dist<(e.r||5)+26 && m.invuln===0) {
+        e.grazed=true;b.grazes++;b.combo=Math.min(99,b.combo+1);b.comboT=210;
+        b.meter=Math.min(100,b.meter+4.5);
+        if(b.combo%5===0)mgBurst(m.ship.x,m.ship.y,'#7dfaff',9);
       }
     }
     m.enemyBullets=m.enemyBullets.filter(e=>!e.dead&&e.y<height+30&&e.y>-30&&e.x>m.fx-35&&e.x<m.fx+m.fw+35);
@@ -646,10 +680,11 @@
       hudText(Math.max(0,Math.ceil(b.hp/b.maxHp*100))+'%   '+(b.type===1?(b.exposed?'CORE OPEN':'SHIELD ACTIVE'):b.type===3?'HIT THE GLOWING VENT':'TARGET LOCKED'),15,61,width-30,10,'#f1f5f9');
       hudText('♥'.repeat(Math.max(0,m.shields))+'♡'.repeat(3-Math.max(0,m.shields)),15,84,width*.55,20,'#ff669b');
       hudText(Math.ceil(m.time/60)+'s',width-15,85,60,17,'#f5d7ff','right');
+      if(b.combo>=2)hudText('✦ GRAZE x'+b.combo,width-15,106,120,12,'#79faff','right');
       const meterW=Math.min(width-30,270),mx=(width-meterW)/2;
       ctx.fillStyle='rgba(255,255,255,.17)';ctx.fillRect(mx,height-27,meterW,9);
       ctx.fillStyle=b.meter>=100?'#ffffff':'#64eaff';ctx.fillRect(mx,height-27,meterW*b.meter/100,9);
-      hudText(b.meter>=100?'PULSE READY • TAP / SPACE':'PULSE CHARGING '+Math.floor(b.meter)+'%',width/2,height-40,width-20,10,b.meter>=100?'#ffffff':'#9feaff','center');
+      hudText(b.meter>=100?'PULSE READY • BUTTON / SPACE':'GRAZE TO CHARGE • '+Math.floor(b.meter)+'%',width/2,height-40,width-20,10,b.meter>=100?'#ffffff':'#9feaff','center');
       if(b.phaseFlash>0){
         ctx.save();ctx.globalAlpha=Math.min(.8,b.phaseFlash/80);ctx.fillStyle='rgba(185,8,40,.13)';ctx.fillRect(0,0,width,height);
         hudText(b.ragePhase===3?'FINAL PHASE — RAMPAGE':'PHASE II — THREAT ESCALATING',width/2,height*.33,width-22,Math.min(20,width*.055),'#ff93ae','center');ctx.restore();
@@ -676,6 +711,7 @@
       hudText(def.tag,width/2,height*.615,width-24,11,def.hue,'center');
       hudText(def.tip,width/2,height*.71,width-30,11,'#f7d8ee','center');
       hudText('LYRA ▸ '+def.brief.replace('Lyra: ',''),width/2,height*.78,width-22,11,'#d5b2ff','center');
+      hudText('TAP SKIP TO ENGAGE',width/2,height*.86,width-24,12,'#ffffff','center');
       ctx.fillStyle='#ff3558';ctx.fillRect(0,height-7,width*m.t/156,7);
     } else if(m.phase==='victory'||m.phase==='defeat') {
       const won=m.phase==='victory';
@@ -687,5 +723,5 @@
     ctx.restore();
   }
   // A tiny debug hook supports automated tests without exposing gameplay controls.
-  window.ORBIT_BOSS_VERSION='2.0';
+  window.ORBIT_BOSS_VERSION='3.0';
 })();
