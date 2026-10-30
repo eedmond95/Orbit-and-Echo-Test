@@ -2,7 +2,7 @@
 (()=>{
 'use strict';
 if(window.ORBIT_EXPERIENCE_VERSION)return;
-window.ORBIT_EXPERIENCE_VERSION='1.0';
+window.ORBIT_EXPERIENCE_VERSION='2.0';
 const doc=document, root=doc.body;
 const style=doc.createElement('style');
 style.textContent=`
@@ -29,7 +29,29 @@ doc.head.appendChild(style);
 const storageKey='orbit-echo-experience-v1';
 let saved={};
 try{saved=JSON.parse(localStorage.getItem(storageKey)||'{}')||{}}catch(_){}
-const data={best:Number(saved.best)||0,runs:Number(saved.runs)||0,sector:Number(saved.sector)||0,scoreMilestones:Array.isArray(saved.scoreMilestones)?saved.scoreMilestones:[],daily:saved.daily||'',dailyBest:Number(saved.dailyBest)||0,bossWins:Number(saved.bossWins)||0};
+const data={best:Number(saved.best)||0,runs:Number(saved.runs)||0,sector:Number(saved.sector)||0,scoreMilestones:Array.isArray(saved.scoreMilestones)?saved.scoreMilestones:[],daily:saved.daily||'',dailyBest:Number(saved.dailyBest)||0,bossWins:Number(saved.bossWins)||0,
+ claimed:(saved.claimed&&typeof saved.claimed==='object'&&!Array.isArray(saved.claimed))?saved.claimed:{},selectedTrail:String(saved.selectedTrail||'standard')};
+const rewards=[
+ {id:'first',name:'First Flight',needed:()=>data.runs>0,prize:'100 stardust + Azure Trail',dust:100,trail:'azure'},
+ {id:'rising',name:'Rising Star',needed:()=>data.best>=5000,prize:'250 stardust + Solar Trail',dust:250,trail:'solar'},
+ {id:'master',name:'Orbit Master',needed:()=>data.best>=15000,prize:'500 stardust + Nebula Trail',dust:500,trail:'nebula'},
+ {id:'legend',name:'Cosmic Legend',needed:()=>data.best>=50000,prize:'1,000 stardust + Royal Trail',dust:1000,trail:'royal'},
+ {id:'daily',name:'Daily Ace',needed:()=>data.dailyBest>=dailyGoal(),prize:'150 stardust (daily)',dust:150,trail:null}
+];
+function dailyGoal(){return 3000+(Number(dateKey().replaceAll('-',''))%5)*1000}
+function claimId(reward){return reward.id==='daily'?'daily:'+dateKey():reward.id}
+function dustBalance(){return rewards.reduce((sum,r)=>sum+(data.claimed[claimId(r)]?r.dust:0),0)}
+function ownTrail(id){return id==='standard'||rewards.some(r=>r.trail===id&&!!data.claimed[r.id])}
+function claimReward(id){
+ const reward=rewards.find(r=>r.id===id);
+ if(!reward||!reward.needed()||data.claimed[claimId(reward)])return false;
+ data.claimed[claimId(reward)]=true;
+ if(reward.trail)data.selectedTrail=reward.trail;
+ persist();notify('REWARD CLAIMED',reward.prize,true);panel();return true;
+}
+function selectedColor(){return {azure:'#80faff',solar:'#ffdc65',nebula:'#cd80ff',royal:'#ff7b9b'}[data.selectedTrail]||null}
+function claimableCount(){return rewards.filter(r=>r.needed()&&!data.claimed[claimId(r)]).length}
+
 const dateKey=()=>{let d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 if(data.daily!==dateKey()){data.daily=dateKey();data.dailyBest=0}
 const persist=()=>{try{localStorage.setItem(storageKey,JSON.stringify(data))}catch(_){}};
@@ -61,26 +83,47 @@ function notify(title,subtitle='',celebrate=false){
  if(celebrate)sparkles();
 }
 const close=()=>{backdrop.classList.remove('open');toggle.focus()};
+const trailCanvas=el('canvas','orbit-reward-trail');trailCanvas.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:95';root.appendChild(trailCanvas);
+const trailCtx=trailCanvas.getContext('2d');let trailFrame=0;
+function drawTrail(){
+ if(!trailCtx||data.selectedTrail==='standard')return;
+ const st=getState();if(!['PLAYING','GAME','PLAY','MINIGAME'].includes(st))return;
+ let ship=null;try{if(typeof mg!=='undefined'&&mg&&mg.ship)ship=mg.ship}catch(_){}
+ if(!ship)return;
+ const dpr=Math.min(devicePixelRatio||1,2), w=innerWidth,h=innerHeight;
+ if(trailCanvas.width!==Math.round(w*dpr)||trailCanvas.height!==Math.round(h*dpr)){trailCanvas.width=Math.round(w*dpr);trailCanvas.height=Math.round(h*dpr)}
+ trailCtx.clearRect(0,0,trailCanvas.width,trailCanvas.height);
+ const x=ship.x*dpr,y=ship.y*dpr,color=selectedColor();
+ if(!color)return;
+ trailCtx.strokeStyle=color;trailCtx.shadowColor=color;trailCtx.shadowBlur=15*dpr;
+ for(let i=0;i<5;i++){trailCtx.globalAlpha=.43-i*.075;trailCtx.lineWidth=(5-i*.7)*dpr;trailCtx.beginPath();trailCtx.arc(x,y+16*dpr+i*9*dpr,(7+i*3)*dpr,.15,Math.PI-.15);trailCtx.stroke()}
+ trailCtx.globalAlpha=1;
+}
+setInterval(drawTrail,60);
 function format(v){return Math.max(0,Math.floor(v)).toLocaleString()}
 function getScore(){try{return typeof score==='number'&&Number.isFinite(score)?score:0}catch(_){return 0}}
 function getLevel(){try{return typeof level==='number'?level:typeof currentLevel==='number'?currentLevel:typeof gateLevel==='number'?gateLevel:0}catch(_){return 0}}
 function getState(){try{return typeof gameState!=='undefined'?String(gameState):''}catch(_){return ''}}
 function panel(){
- const dailyGoal=3000+(Number(dateKey().replaceAll('-',''))%5)*1000;
- const progress=Math.min(100,Math.round(data.dailyBest/dailyGoal*100));
- const unlocks=[['First Flight',data.runs>0],['Rising Star',data.best>=5000],['Orbit Master',data.best>=15000],['Cosmic Legend',data.best>=50000],['Daily Ace',data.dailyBest>=dailyGoal]];
+ const dailyTarget=dailyGoal();
+ const progress=Math.min(100,Math.round(data.dailyBest/dailyTarget*100));
+ const unlocks=rewards.map(r=>[r.name,r.needed()]);
  card.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>✦ PILOT MISSIONS</h2><button type="button" class="orbit-exp-button" id="orbit-exp-close">✕</button></div>'+
  '<p>Every run counts. Beat your personal best, master the invasion, and share your high score.</p>'+
  '<div class="orbit-exp-row"><span>🏆 Personal best</span><b>'+format(data.best)+'</b></div>'+
  '<div class="orbit-exp-row"><span>🚀 Runs launched</span><b>'+format(data.runs)+'</b></div>'+
  '<div class="orbit-exp-row"><span>⭐ Highest sector</span><b>'+format(data.sector)+'</b></div>'+
- '<div class="orbit-exp-row"><span>🌠 Daily challenge<br><small style="color:#9baec6">Score '+format(dailyGoal)+' points today</small></span><b>'+format(data.dailyBest)+' / '+format(dailyGoal)+'</b></div>'+
+ '<div class="orbit-exp-row"><span>🌠 Daily challenge<br><small style="color:#9baec6">Score '+format(dailyTarget)+' points today</small></span><b>'+format(data.dailyBest)+' / '+format(dailyGoal)+'</b></div>'+
  '<div class="orbit-exp-progress"><div style="width:'+progress+'%"></div></div>'+
- '<p style="margin-top:24px">ACHIEVEMENTS · '+unlocks.filter(a=>a[1]).length+'/'+unlocks.length+' unlocked</p>'+
- unlocks.map(a=>'<div class="orbit-exp-row"><span>'+(a[1]?'✨':'🔒')+' '+a[0]+'</span><b>'+(a[1]?'UNLOCKED':'LOCKED')+'</b></div>').join('')+
+ '<p style="margin-top:24px">ACHIEVEMENTS · '+unlocks.filter(a=>a[1]).length+'/'+unlocks.length+' unlocked · ✦ '+format(dustBalance())+' stardust earned</p>'+
+ rewards.map(r=>{const done=!!data.claimed[claimId(r)],earned=r.needed();return '<div class="orbit-exp-row"><span>'+(earned?'✨':'🔒')+' <strong>'+r.name+'</strong><br><small style="color:#a9c3de">'+r.prize+'</small></span>'+(done?'<b>CLAIMED ✓</b>':earned?'<button class="orbit-exp-button primary orbit-claim" data-reward="'+r.id+'" type="button">CLAIM</button>':'<b>LOCKED</b>')+'</div>'}).join('')+
+ '<p>Equip unlocked thruster trails (cosmetic reward)</p>'+
+ '<div class="orbit-exp-row"><label for="orbit-trail-choice">Ship trail</label><select id="orbit-trail-choice" style="background:#171e3b;color:#fff;border:1px solid #7bdefc;border-radius:8px;padding:8px">'+[['standard','Standard'],['azure','Azure'],['solar','Solar'],['nebula','Nebula'],['royal','Royal']].filter(a=>ownTrail(a[0])).map(a=>'<option value="'+a[0]+'" '+(data.selectedTrail===a[0]?'selected':'')+'>'+a[1]+'</option>').join('')+'</select></div>'+
  '<div style="display:flex;gap:9px;margin-top:17px"><button class="orbit-exp-button primary" id="orbit-exp-share" type="button" style="flex:1">↗ SHARE SCORE</button><button class="orbit-exp-button" id="orbit-exp-play" type="button">PLAY ▶</button></div>'+
  '<p style="text-align:center;font-size:11px;margin:16px 0 0">Hold to orbit • Release to launch • Dodge closely to charge Hyper Pulse during bosses.</p>';
  card.querySelector('#orbit-exp-close').onclick=close;
+ card.querySelectorAll('.orbit-claim').forEach(btn=>btn.onclick=()=>claimReward(btn.dataset.reward));
+ card.querySelector('#orbit-trail-choice').onchange=e=>{const choice=e.target.value;if(ownTrail(choice)){data.selectedTrail=choice;persist();notify('SHIP TRAIL EQUIPPED',choice.toUpperCase())}};
  card.querySelector('#orbit-exp-play').onclick=close;
  card.querySelector('#orbit-exp-share').onclick=async()=>{
   const value='🚀 I scored '+format(data.best)+' in Orbit & Echo! Can you beat my score? https://eedmond95.github.io/Orbit-and-Echo-Test/';
@@ -106,6 +149,7 @@ function observe(){
  const dailyGoal=3000+(Number(dateKey().replaceAll('-',''))%5)*1000;
  if(playing&&data.dailyBest>=dailyGoal&&!data.scoreMilestones.includes('daily:'+dateKey())){data.scoreMilestones.push('daily:'+dateKey());persist();notify('DAILY CHALLENGE COMPLETE','Brilliant flying!',true)}
  if(roundActive&&!playing&&previousState!==st){roundActive=false;persist()}
+ const pending=claimableCount();toggle.textContent=pending?'✦ MISSIONS • '+pending+' REWARDS':'✦ MISSIONS';
  // Keep controls away from combat and preserve original game's pointer interactions.
  toggle.style.display=st==='MINIGAME'?'none':'block';
  if(!backdrop.classList.contains('open')&&st!==previousState&&st==='MENU')persist();
@@ -113,5 +157,5 @@ function observe(){
 }
 setInterval(observe,500);
 addEventListener('pagehide',persist);
-window.ORBIT_EXP_DEBUG={version:'1.0',refresh:panel};
+window.ORBIT_EXP_DEBUG={version:'2.0',refresh:panel,claim:claimReward};
 })();
