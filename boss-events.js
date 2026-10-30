@@ -327,12 +327,19 @@
       const wx=b.type===3?b.x+(b.weakIndex-1)*34:b.x;
       const wy=b.type===3?b.y+16:b.y;
       for(const off of [-7,7]) {
-        const dx=wx-m.ship.x+off,dy=wy-m.ship.y;
-        const mag=Math.hypot(dx,dy)||1;
-        m.bullets.push({x:m.ship.x+off,y:m.ship.y-14,vx:b.type===0?0:dx/mag*13,vy:b.type===0?-13:dy/mag*13,damage:1.6+m.gate.level*.065});
+        if(b.type===0) {
+          // RIFT HYDRA: immutable vertical trajectory. Never calculate an aimed vector.
+          m.bullets.push({x:m.ship.x+off,y:m.ship.y-14,vx:0,vy:-13,damage:1.6+m.gate.level*.065});
+        } else {
+          const dx=wx-m.ship.x+off,dy=wy-m.ship.y;
+          const mag=Math.hypot(dx,dy)||1;
+          m.bullets.push({x:m.ship.x+off,y:m.ship.y-14,vx:dx/mag*13,vy:dy/mag*13,damage:1.6+m.gate.level*.065});
+        }
       }
     }
     for(const bullet of m.bullets) {
+      // Defensive correction if other engine hooks ever modify projectiles.
+      if(b.type===0){bullet.vx=0;bullet.vy=-13;}
       bullet.x+=bullet.vx;bullet.y+=bullet.vy;
       const wx=b.type===3?b.x+(b.weakIndex-1)*34:b.x;
       const wy=b.type===3?b.y+16:b.y;
@@ -677,6 +684,7 @@
       drawPilotBadge(width-34,33,16,m.hitFlash>0?'#ff3969':getActivePilot().color);
       ctx.fillStyle='rgba(255,255,255,.15)';ctx.fillRect(15,40,width-30,12);
       ctx.fillStyle=def.hue;ctx.fillRect(15,40,(width-30)*clamp(b.hp/b.maxHp,0,1),12);
+      if(b.type===0)hudText('MANUAL AIM  •  STRAIGHT SHOTS  •  v3.2',width/2,110,width-20,12,'#89faff','center');
       hudText(Math.max(0,Math.ceil(b.hp/b.maxHp*100))+'%   '+(b.type===1?(b.exposed?'CORE OPEN':'SHIELD ACTIVE'):b.type===3?'HIT THE GLOWING VENT':'TARGET LOCKED'),15,61,width-30,10,'#f1f5f9');
       hudText('♥'.repeat(Math.max(0,m.shields))+'♡'.repeat(3-Math.max(0,m.shields)),15,84,width*.55,20,'#ff669b');
       hudText(Math.ceil(m.time/60)+'s',width-15,85,60,17,'#f5d7ff','right');
@@ -723,5 +731,5 @@
     ctx.restore();
   }
   // A tiny debug hook supports automated tests without exposing gameplay controls.
-  window.ORBIT_BOSS_VERSION='3.0';
+  window.ORBIT_BOSS_VERSION='3.2';
 })();
