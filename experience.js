@@ -30,7 +30,7 @@ const storageKey='orbit-echo-experience-v1';
 let saved={};
 try{saved=JSON.parse(localStorage.getItem(storageKey)||'{}')||{}}catch(_){}
 const data={best:Number(saved.best)||0,runs:Number(saved.runs)||0,sector:Number(saved.sector)||0,scoreMilestones:Array.isArray(saved.scoreMilestones)?saved.scoreMilestones:[],daily:saved.daily||'',dailyBest:Number(saved.dailyBest)||0,bossWins:Number(saved.bossWins)||0,
- claimed:(saved.claimed&&typeof saved.claimed==='object'&&!Array.isArray(saved.claimed))?saved.claimed:{},selectedTrail:String(saved.selectedTrail||'standard')};
+ claimed:(saved.claimed&&typeof saved.claimed==='object'&&!Array.isArray(saved.claimed))?saved.claimed:{},stardust:Number(saved.stardust)||0,selectedTrail:String(saved.selectedTrail||'standard')};
 const rewards=[
  {id:'first',name:'First Flight',needed:()=>data.runs>0,prize:'100 stardust + Azure Trail',dust:100,trail:'azure'},
  {id:'rising',name:'Rising Star',needed:()=>data.best>=5000,prize:'250 stardust + Solar Trail',dust:250,trail:'solar'},
@@ -40,12 +40,13 @@ const rewards=[
 ];
 function dailyGoal(){return 3000+(Number(dateKey().replaceAll('-',''))%5)*1000}
 function claimId(reward){return reward.id==='daily'?'daily:'+dateKey():reward.id}
-function dustBalance(){return rewards.reduce((sum,r)=>sum+(data.claimed[claimId(r)]?r.dust:0),0)}
+function dustBalance(){return data.stardust}
 function ownTrail(id){return id==='standard'||rewards.some(r=>r.trail===id&&!!data.claimed[r.id])}
 function claimReward(id){
  const reward=rewards.find(r=>r.id===id);
  if(!reward||!reward.needed()||data.claimed[claimId(reward)])return false;
  data.claimed[claimId(reward)]=true;
+ data.stardust+=reward.dust;
  if(reward.trail)data.selectedTrail=reward.trail;
  persist();notify('REWARD CLAIMED',reward.prize,true);panel();return true;
 }
@@ -116,7 +117,7 @@ function panel(){
  '<div class="orbit-exp-row"><span>⭐ Highest sector</span><b>'+format(data.sector)+'</b></div>'+
  '<div class="orbit-exp-row"><span>🌠 Daily challenge<br><small style="color:#9baec6">Score '+format(dailyTarget)+' points today</small></span><b>'+format(data.dailyBest)+' / '+format(dailyTarget)+'</b></div>'+
  '<div class="orbit-exp-progress"><div style="width:'+progress+'%"></div></div>'+
- '<p style="margin-top:24px">ACHIEVEMENTS · '+unlocks.filter(a=>a[1]).length+'/'+unlocks.length+' unlocked · ✦ '+format(dustBalance())+' stardust earned</p>'+
+ '<p style="margin-top:24px">ACHIEVEMENTS · '+unlocks.filter(a=>a[1]).length+'/'+unlocks.length+' unlocked · ✦ '+format(dustBalance())+' stardust collected</p>'+
  rewards.map(r=>{const done=!!data.claimed[claimId(r)],earned=r.needed();return '<div class="orbit-exp-row"><span>'+(earned?'✨':'🔒')+' <strong>'+r.name+'</strong><br><small style="color:#a9c3de">'+r.prize+'</small></span>'+(done?'<b>CLAIMED ✓</b>':earned?'<button class="orbit-exp-button primary orbit-claim" data-reward="'+r.id+'" type="button">CLAIM</button>':'<b>LOCKED</b>')+'</div>'}).join('')+
  '<p>Equip unlocked thruster trails (cosmetic reward)</p>'+
  '<div class="orbit-exp-row"><label for="orbit-trail-choice">Ship trail</label><select id="orbit-trail-choice" style="background:#171e3b;color:#fff;border:1px solid #7bdefc;border-radius:8px;padding:8px">'+[['standard','Standard'],['azure','Azure'],['solar','Solar'],['nebula','Nebula'],['royal','Royal']].filter(a=>ownTrail(a[0])).map(a=>'<option value="'+a[0]+'" '+(data.selectedTrail===a[0]?'selected':'')+'>'+a[1]+'</option>').join('')+'</select></div>'+
