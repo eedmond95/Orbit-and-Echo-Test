@@ -15,5 +15,7 @@ jobs:
           node-version: '22'
       - name: Check boss script syntax
         run: node --check boss-events.js
+      - name: Check mission reward script syntax
+        run: node --check experience.js
       - name: Test boss progression and rewards
         run: node --test tests/boss-events.test.mjs
